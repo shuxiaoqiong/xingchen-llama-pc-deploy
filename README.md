@@ -1,6 +1,6 @@
 # xingchen-llama-pc-deploy
 
-Uploading xingchen-use.mp4…
+https://github.com/user-attachments/assets/6fad2612-27a9-497c-b03e-340e98c8e86f
 
 
 两种方案，从零到对话只需 10 分钟
