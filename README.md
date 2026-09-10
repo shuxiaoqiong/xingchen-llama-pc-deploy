@@ -40,7 +40,7 @@ nvcc --version
 ```
 三条命令都有输出，说明环境就绪。
 ### 2.2 获取脚本
-将部署脚本 deploy-xingchen4.ps1 放到当前工作目录，脚本会在此目录下自动克隆 llama.cpp 仓库。
+将部署脚本 [deploy-xingchen4.ps1](https://github.com/shuxiaoqiong/xingchen-llama-pc-deploy/releases/download/deploy-with-compile/deploy-xingchen4.ps1) 放到当前工作目录，脚本会在此目录下自动克隆 llama.cpp 仓库。
 ### 2.3 运行脚本
 在 PowerShell 中执行：
 ```
@@ -94,7 +94,7 @@ Step 7	启动 llama-server 并自动打开浏览器
 ●已安装 NVIDIA 显卡驱动
 ●不想安装开发工具链（Git / CMake / VS2022 / CUDA Toolkit）
 ### 3.2 部署包内容
-部署包是一个tar文件夹，包含以下文件：
+部署包是一个[tar压缩包](https://github.com/shuxiaoqiong/xingchen-llama-pc-deploy/releases/download/deploy-without-compile/xingchen4-deploy.tar)，包含以下文件：
 | 文件 | 说明 | 大小 |
 |---|---|---|
 | `llama-server.exe` | 静态编译的推理引擎（含嵌入式 Web UI） | ~43 MB |
