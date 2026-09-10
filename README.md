@@ -1,5 +1,8 @@
 # xingchen-llama-pc-deploy
 
+https://github.com/user-attachments/assets/04df6693-5b3f-41da-b075-2b95e2a23aa7
+
+
 两种方案，从零到对话只需 10 分钟
 
 ## 一、模型简介
@@ -182,5 +185,5 @@ Q: CPU 模式怎么用
   XingChen4-29B GGUF 模型文件 (IQ4_NL 量化)
 ```
 llama-server 是基于 llama.cpp 的 HTTP 推理服务，提供 OpenAI 兼容的 API 接口和内置 Web UI 对话页面。静态编译将 ggml 计算库、llama 模型库、Web UI 资源全部嵌入单个 exe，运行时仅需 CUDA 运行时 DLL。
-
+![星辰模型部署示例](https://raw.githubusercontent.com/shuxiaoqiong/xingchen-llama-pc-deploy/main/%E6%98%9F%E8%BE%B0%E6%A8%A1%E5%9E%8B%E9%83%A8%E7%BD%B2%E7%A4%BA%E4%BE%8B.png)
 
