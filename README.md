@@ -6,7 +6,16 @@ https://github.com/user-attachments/assets/6fad2612-27a9-497c-b03e-340e98c8e86f
 两种方案，从零到对话只需 10 分钟
 
 ## 一、模型简介
-XingChen4-29B 是 DeepSeek-V4 风格的 MoE 架构大模型（MLA + MoE + HC 定制），总参数 29B，int4权重采用 IQ4_NL 混合精度量化，量化后约 18GB（两个 GGUF 分片），可在单张消费级 GPU 上运行。
+XingChen4-29B 是 DeepSeek-V4 风格的 MoE 架构大模型（MLA + MoE + HC 定制），总参数 29B，int4权重采用 IQ4_NL 混合精度量化，量化后约 18GB（两个 GGUF 分片），可在单张消费级 GPU 上运行。  
+### 硬件环境
+本次测试环境如下：  
+| **项目** | **配置** |
+|---|---|
+| 操作系统 | Windows 11 |
+| GPU | RTX 3090 24GB |
+| CUDA Driver Version | 13.1 |
+| 推理框架 | llama.cpp |
+### 部署方案
 本文提供两种部署方案，按需选择：
 | | 方案一：一键编译 | 方案二：免编译分发 |
 |---|---|---|
@@ -85,7 +94,7 @@ Step 7	启动 llama-server 并自动打开浏览器
 ●已安装 NVIDIA 显卡驱动
 ●不想安装开发工具链（Git / CMake / VS2022 / CUDA Toolkit）
 ### 3.2 部署包内容
-部署包是一个文件夹，包含以下文件：
+部署包是一个tar文件夹，包含以下文件：
 | 文件 | 说明 | 大小 |
 |---|---|---|
 | `llama-server.exe` | 静态编译的推理引擎（含嵌入式 Web UI） | ~43 MB |
@@ -96,7 +105,7 @@ Step 7	启动 llama-server 并自动打开浏览器
 | `xingchen4-iq4-00001-of-00002.gguf` | 模型分片 1 | ~9.7 GB |
 | `xingchen4-iq4-00002-of-00002.gguf` | 模型分片 2 | ~9.0 GB |
 
-模型即将开源，欢迎关注TeleAI的huggingface仓库：https://huggingface.co/Tele-AI。
+模型即将开源，欢迎关注TeleAI的huggingface仓库：https://huggingface.co/Tele-AI
 ### 3.3 部署步骤
 Step 1：解压部署包
 将整个文件夹拷贝到目标机器任意目录（如 D:\xingchen4-deploy\）。
@@ -154,36 +163,18 @@ set STATICPATH=                                rem Web UI目录（空=用内置�
 建议：如果你是开发者，用方案一；如果你只是想跑起来用，用方案二。
 
 ## 五、常见问题
-Q: 启动后浏览器显示 “Server unavailable”
-检查命令行窗口是否有报错。常见原因：模型文件路径不对、端口被占用、GPU 显存不足。
+Q: 启动后浏览器显示 “Server unavailable”    
+A:检查命令行窗口是否有报错。常见原因：模型文件路径不对、端口被占用、GPU 显存不足。
+ 
+Q: 浏览器打开 0.0.0.0:8086，页面无法访问  
+A:0.0.0.0 是服务端监听地址，客户端需用 http://127.0.0.1:8086 访问。run-server.bat 已自动用 127.0.0.1 打开浏览器。
 
-Q: 浏览器打开的是 0.0.0.0:8086，页面无法访问
-0.0.0.0 是服务端监听地址，客户端需用 http://127.0.0.1:8086 访问。run-server.bat 已自动用 127.0.0.1 打开浏览器。
+Q: CUDA DLL 缺失报错  
+A:方案二中，三个 CUDA DLL 必须和 llama-server.exe 在同一目录。如果目标机器 GPU 型号不同，需替换为对应版本的 CUDA DLL。
 
-Q: CUDA DLL 缺失报错
-方案二中，三个 CUDA DLL 必须和 llama-server.exe 在同一目录。如果目标机器 GPU 型号不同，需替换为对应版本的 CUDA DLL。
+Q: 显存不够（oom）    
+A:减小上下文大小（-c 32768 或更小）、使用 KV 缓存量化（--cache-type-k q4_0 --cache-type-v q4_0）、减少 GPU 层数（-ngl 值）。
 
-Q: 显存不够
-减小上下文大小（-c 65536 或更小）、使用 KV 缓存量化（--cache-type-k q8_0 --cache-type-v q8_0）、减少 GPU 层数（-ngl 值）。
-
-Q: CPU 模式怎么用
-方案一：.\deploy-xingchen4.ps1 -Backend cpu
-方案二：编辑 run-server.bat，将 set NGL=0。
-
-## 六、技术架构
-```
-用户浏览器 (127.0.0.1:8086)
-        |
-        v
-  llama-server.exe  ← 静态编译，内含 ggml + llama + Web UI
-        |
-        +-- GPU 后端 (CUDA)  ← cudart64 / cublas64 / cublasLt64
-        |
-        +-- CPU 后端 (AVX2)  ← 自动回退
-        |
-        v
-  XingChen4-29B GGUF 模型文件 (IQ4_NL 量化)
-```
-llama-server 是基于 llama.cpp 的 HTTP 推理服务，提供 OpenAI 兼容的 API 接口和内置 Web UI 对话页面。静态编译将 ggml 计算库、llama 模型库、Web UI 资源全部嵌入单个 exe，运行时仅需 CUDA 运行时 DLL。
-![星辰模型部署示例](https://raw.githubusercontent.com/shuxiaoqiong/xingchen-llama-pc-deploy/main/%E6%98%9F%E8%BE%B0%E6%A8%A1%E5%9E%8B%E9%83%A8%E7%BD%B2%E7%A4%BA%E4%BE%8B.png)
-
+Q: CPU 模式怎么用  
+A:方案一：.\deploy-xingchen4.ps1 -Backend cpu
+  方案二：编辑 run-server.bat，将 set NGL=0。
