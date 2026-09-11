@@ -88,16 +88,19 @@ if (Get-Command cmake -CommandType Application -ErrorAction SilentlyContinue) {
 }
 
 # Visual Studio 2022 (via vswhere)
-$vsFound = $false
-$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-if (Test-Path $vswhere) {
+$vsPath = $null
+$vswhereCandidates = @(
+    "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe",
+    "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe"
+)
+$vswhere = $vswhereCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($vswhere) {
     $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
     if ($vsPath) {
         Write-OK "Visual Studio 2022: $vsPath"
-        $vsFound = $true
     }
 }
-if (-not $vsFound) {
+if (-not $vsPath) {
     Write-Err "Visual Studio 2022 (with C++ desktop) not found. Install: https://visualstudio.microsoft.com/downloads"
     $missing += "Visual Studio 2022"
 }
@@ -173,12 +176,31 @@ Write-Step "3/7  Clone / update llama.cpp"
 $llamaCppDir = Join-Path $WorkDir "llama.cpp"
 $llamaCppUrl = "$CloneBase/llama.cpp"
 
+# Helper: is the local repo already on the target branch with a clean worktree?
+function Test-RepoReady {
+    param([string]$Dir, [string]$Branch)
+    try {
+        Push-Location $Dir
+        $cur = git rev-parse --abbrev-ref HEAD 2>$null
+        $clean = (git status --porcelain 2>$null) -eq $null -or -not (git status --porcelain 2>$null)
+        Pop-Location
+        return ($cur -eq $Branch) -and ($clean)
+    } catch {
+        Pop-Location
+        return $false
+    }
+}
+
 if (Test-Path (Join-Path $llamaCppDir ".git")) {
-    Write-Info "llama.cpp exists, running git pull ..."
-    Push-Location $llamaCppDir
-    git pull 2>&1 | ForEach-Object { Write-Info $_ }
-    if ($LASTEXITCODE -ne 0) { Exit-Script "git pull failed for llama.cpp (exit $LASTEXITCODE)" }
-    Pop-Location
+    if (Test-RepoReady -Dir $llamaCppDir -Branch "xingchen4-port") {
+        Write-OK "Repo already on xingchen4-port branch with clean worktree, skipping git pull"
+    } else {
+        Write-Info "llama.cpp exists, running git pull ..."
+        Push-Location $llamaCppDir
+        git pull 2>&1 | ForEach-Object { Write-Info $_ }
+        if ($LASTEXITCODE -ne 0) { Exit-Script "git pull failed for llama.cpp (exit $LASTEXITCODE)" }
+        Pop-Location
+    }
 } else {
     Write-Info "Cloning llama.cpp -> $llamaCppDir"
     git clone $llamaCppUrl $llamaCppDir 2>&1 | ForEach-Object { Write-Info $_ }
@@ -196,19 +218,25 @@ Write-Step "4/7  Switch to xingchen4-port branch"
 
 Push-Location $llamaCppDir
 try {
-    git fetch origin 2>&1 | ForEach-Object { Write-Info $_ }
-    if ($LASTEXITCODE -ne 0) { Exit-Script "git fetch failed (exit $LASTEXITCODE)" }
-
-    $branchExists = git branch --list "xingchen4-port" 2>$null
-    if ($branchExists) {
-        git checkout xingchen4-port 2>&1 | ForEach-Object { Write-Info $_ }
-    } else {
-        git checkout -b xingchen4-port origin/xingchen4-port 2>&1 | ForEach-Object { Write-Info $_ }
-    }
-
     $currentBranch = git rev-parse --abbrev-ref HEAD
-    if ($currentBranch -ne "xingchen4-port") {
-        Exit-Script "Branch switch failed. Current: $currentBranch"
+
+    if ($currentBranch -eq "xingchen4-port" -and -not (git status --porcelain)) {
+        Write-OK "Already on xingchen4-port, skipping fetch/checkout"
+    } else {
+        git fetch origin 2>&1 | ForEach-Object { Write-Info $_ }
+        if ($LASTEXITCODE -ne 0) { Exit-Script "git fetch failed (exit $LASTEXITCODE)" }
+
+        $branchExists = git branch --list "xingchen4-port" 2>$null
+        if ($branchExists) {
+            git checkout xingchen4-port 2>&1 | ForEach-Object { Write-Info $_ }
+        } else {
+            git checkout -b xingchen4-port origin/xingchen4-port 2>&1 | ForEach-Object { Write-Info $_ }
+        }
+
+        $currentBranch = git rev-parse --abbrev-ref HEAD
+        if ($currentBranch -ne "xingchen4-port") {
+            Exit-Script "Branch switch failed. Current: $currentBranch"
+        }
     }
     Write-OK "Current branch: $currentBranch"
 } finally {
@@ -301,12 +329,21 @@ if (Test-Path $serverExe) {
 }
 
 if ($needBuild) {
+    # Remove stale build directory to avoid CMakeCache.txt path conflicts
+    # (e.g. after the source tree was moved to a different location)
     if (Test-Path $buildDir) {
         Write-Info "Removing stale build directory: $buildDir"
         Remove-Item -Recurse -Force $buildDir
     }
+
     Push-Location $llamaCppDir
     try {
+        # NOTE: Do NOT pass CMAKE_GENERATOR_INSTANCE here. CMake's VS generator
+        # auto-discovers installed instances (any path) via the VS Installer
+        # registry; explicitly pinning an instance can break builds when the
+        # detected path is not a registered instance (e.g. custom/unregistered
+        # installs) - observed with "could not find specified instance" errors.
+
         if ($Backend -eq 'gpu') {
             Write-Info "CMake configure ... (CUDA: $cudaRoot)"
             cmake -B build -S . `
@@ -355,7 +392,7 @@ if (-not (Test-Path $ModelPath)) {
     Write-Warn2 "Model not found: $ModelPath"
     Write-Info "Place GGUF model at the specified path, or enter it below."
     Write-Info "Tip: use HF-Mirror (hfd tool) for 5-10x faster download"
-    $ModelPath = Read-Host "Enter model file path (or Ctrl+C to exit)"
+    $ModelPath = (Read-Host "Enter model file path (or Ctrl+C to exit)").Trim().Trim('"').Trim("'")
     if (-not $ModelPath -or -not (Test-Path $ModelPath)) {
         Exit-Script "Model file does not exist"
     }
