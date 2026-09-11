@@ -90,7 +90,7 @@ Step 7	启动 llama-server 并自动打开浏览器
 
 ## 三、方案二：免编译分发
 ### 3.1 适用场景
-●目标机器与编译机器同型号 GPU
+●目标机器 GPU 架构与编译机相同或更新（如 3090/3050 同为 sm_86，4090 sm_89 向下兼容）   
 ●已安装 NVIDIA 显卡驱动
 ●不想安装开发工具链（Git / CMake / VS2022 / CUDA Toolkit）
 ### 3.2 部署包内容
@@ -110,7 +110,7 @@ Step 7	启动 llama-server 并自动打开浏览器
 Step 1：解压部署包
 将整个文件夹拷贝到目标机器任意目录（如 D:\xingchen4-deploy\）。
 Step 2：放入模型文件
-如果模型文件不在部署包中，将两个 GGUF 分片放入部署目录，与 run-server.bat 同级：
+如果模型文件不在部署包中，将两个 GGUF 分片放入部署目录，与 run-server.bat 同级，最终结构如下：
 ```
 D:\xingchen4-deploy\
   ├── llama-server.exe
